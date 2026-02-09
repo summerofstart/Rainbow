@@ -23,6 +23,7 @@ public class FontMapper {
             Identifier textureIdentifier = provider.file();
             List<String> chars = provider.chars().orElse(List.of());
             int height = provider.height().orElse(8);
+            int ascent = provider.ascent().orElse(7);
 
             int rows = chars.size();
             if (rows == 0) continue;
@@ -33,6 +34,7 @@ public class FontMapper {
             int texWidth = texture.map(tex -> tex.sizeOfFrame().width()).orElse(256);
             int texHeight = texture.map(tex -> tex.sizeOfFrame().height()).orElse(256);
 
+            // Calculate character dimensions by dividing texture size by grid size
             int charWidth = texWidth / cols;
             int charHeight = texHeight / rows;
 
@@ -42,15 +44,17 @@ public class FontMapper {
                 int[] codePoints = chars.get(row).codePoints().toArray();
                 for (int col = 0; col < Math.min(codePoints.length, cols); col++) {
                     int codePoint = codePoints[col];
-                    if (codePoint == 0 || codePoint == 32) continue; // Skip null and space (space is handled specially)
+                    if (codePoint == 0 || codePoint == 32) continue; // Skip null and space
 
                     String character = new String(new int[]{codePoint}, 0, 1);
 
+                    // We use the ascent to slightly adjust the vertical positioning if possible,
+                    // but Bedrock's font format is limited. We'll use height as advance.
                     fontData.put(character, new BedrockFont.CharacterData(
                             bedrockTexture,
                             List.of(col * charWidth, row * charHeight),
                             List.of(charWidth, charHeight),
-                            height // advance
+                            height // advance (horizontal width in-game)
                     ));
                 }
             }

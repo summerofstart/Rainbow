@@ -26,10 +26,6 @@ public class GeometryMapper {
         }
 
         BedrockGeometry.Builder builder = BedrockGeometry.builder(identifier);
-        // Blockbench seems to always use these values TODO that's wrong
-        builder.withVisibleBoundsWidth(4.0F);
-        builder.withVisibleBoundsHeight(4.0F);
-        builder.withVisibleBoundsOffset(new Vector3f(0.0F, 0.75F, 0.0F));
 
         builder.withTextureWidth(textures.width());
         builder.withTextureHeight(textures.height());
@@ -49,7 +45,16 @@ public class GeometryMapper {
 
         // Calculate the pivot to be at the centre of the bone
         // This is important for animations later, display animations rotate around the centre on Java
-        bone.withPivot(min.add(max.sub(min).div(2.0F)));
+        Vector3f centre = min.add(max.sub(min, new Vector3f()).div(2.0F), new Vector3f());
+        bone.withPivot(centre);
+
+        // Calculate visible bounds based on the model size
+        float width = max.x() - min.x();
+        float height = max.y() - min.y();
+        float depth = max.z() - min.z();
+        builder.withVisibleBoundsWidth(Math.max(width, depth) / 16.0F);
+        builder.withVisibleBoundsHeight(height / 16.0F);
+        builder.withVisibleBoundsOffset(new Vector3f(centre).div(16.0F));
 
         // Bind to the bone of the current item slot
         bone.withBinding("q.item_slot_to_bone_name(context.item_slot)");
