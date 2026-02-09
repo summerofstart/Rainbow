@@ -14,7 +14,11 @@ import org.joml.Vector2fc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -59,6 +63,16 @@ public class CodecUtil {
         } catch (IOException exception) {
             Rainbow.LOGGER.warn("Failed to read JSON file {}!", path, exception);
             throw exception;
+        }
+    }
+
+    public static <T> T readJson(Codec<T> codec, InputStream stream) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+            JsonElement json = GSON.fromJson(reader, JsonElement.class);
+            return codec.parse(JsonOps.INSTANCE, json).getOrThrow();
+        } catch (Exception exception) {
+            Rainbow.LOGGER.warn("Failed to read JSON from stream!", exception);
+            throw new IOException(exception);
         }
     }
 

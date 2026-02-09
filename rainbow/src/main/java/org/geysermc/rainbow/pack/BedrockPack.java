@@ -14,6 +14,7 @@ import org.geysermc.rainbow.PackConstants;
 import org.geysermc.rainbow.Rainbow;
 import org.geysermc.rainbow.RainbowIO;
 import org.geysermc.rainbow.mapping.AssetResolver;
+import org.geysermc.rainbow.mapping.BedrockItemConsumer;
 import org.geysermc.rainbow.mapping.BedrockItemMapper;
 import org.geysermc.rainbow.mapping.PackContext;
 import org.geysermc.rainbow.mapping.PackSerializer;
@@ -24,8 +25,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +45,7 @@ public class BedrockPack {
 
     private final BedrockTextures.Builder itemTextures = BedrockTextures.builder();
     private final Set<BedrockItem> bedrockItems = new HashSet<>();
+    private final Map<Identifier, BedrockFont> bedrockFonts = new HashMap<>();
     private final Set<Identifier> modelsMapped = new HashSet<>();
     private final Set<Pair<Item, Integer>> customModelDataMapped = new HashSet<>();
 
@@ -57,15 +61,27 @@ public class BedrockPack {
         this.serializer = serializer;
 
         // Not reading existing item mappings/texture atlas for now since that doesn't work all that well yet
-        this.context = new PackContext(new GeyserMappings(), paths, item -> {
-            itemTextures.withItemTexture(item);
-            bedrockItems.add(item);
+        this.context = new PackContext(new GeyserMappings(), paths, new BedrockItemConsumer() {
+            @Override
+            public void accept(BedrockItem item) {
+                itemTextures.withItemTexture(item);
+                bedrockItems.add(item);
+            }
+
+            @Override
+            public void acceptFont(Identifier identifier, BedrockFont font) {
+                mapFont(identifier, font);
+            }
         }, assetResolver, geometryRenderer, reportSuccesses);
         this.reporter = reporter;
     }
 
     public String name() {
         return name;
+    }
+
+    public PackContext getContext() {
+        return context;
     }
 
     public MappingResult map(ItemStack stack) {
@@ -120,6 +136,10 @@ public class BedrockPack {
     public CompletableFuture<?> save() {
         List<CompletableFuture<?>> futures = new ArrayList<>();
 
+        for (Map.Entry<Identifier, BedrockFont> entry : bedrockFonts.entrySet()) {
+            futures.add(serializer.saveJson(BedrockFont.CODEC, entry.getValue(), paths.font().resolve(Rainbow.bedrockSafeIdentifier(entry.getKey()) + ".json")));
+        }
+
         futures.add(serializer.saveJson(GeyserMappings.CODEC, context.mappings(), paths.mappings()));
         manifest.ifPresent(manifest -> futures.add(serializer.saveJson(PackManifest.CODEC, manifest, paths.manifest())));
         futures.add(serializer.saveJson(BedrockTextureAtlas.CODEC, BedrockTextureAtlas.itemAtlas(name, itemTextures), paths.itemAtlas()));
@@ -154,6 +174,10 @@ public class BedrockPack {
         return Set.copyOf(bedrockItems);
     }
 
+    public void mapFont(Identifier identifier, BedrockFont font) {
+        bedrockFonts.put(identifier, font);
+    }
+
     public int getItemTextureAtlasSize() {
         return itemTextures.build().size();
     }
@@ -170,6 +194,7 @@ public class BedrockPack {
         private static final Path ATTACHABLES_DIRECTORY = Path.of("attachables");
         private static final Path GEOMETRY_DIRECTORY = Path.of("models/entity");
         private static final Path ANIMATION_DIRECTORY = Path.of("animations");
+        private static final Path FONT_DIRECTORY = Path.of("font");
 
         private static final Path MANIFEST_FILE = Path.of("manifest.json");
         private static final Path ITEM_ATLAS_FILE = Path.of("textures/item_texture.json");
@@ -183,6 +208,7 @@ public class BedrockPack {
         private UnaryOperator<Path> attachablesPath = resolve(ATTACHABLES_DIRECTORY);
         private UnaryOperator<Path> geometryPath = resolve(GEOMETRY_DIRECTORY);
         private UnaryOperator<Path> animationPath = resolve(ANIMATION_DIRECTORY);
+        private UnaryOperator<Path> fontPath = resolve(FONT_DIRECTORY);
         private UnaryOperator<Path> manifestPath = resolve(MANIFEST_FILE);
         private UnaryOperator<Path> itemAtlasPath = resolve(ITEM_ATLAS_FILE);
         private Path packZipFile = null;
@@ -272,7 +298,8 @@ public class BedrockPack {
 
         public BedrockPack build() {
             PackPaths paths = new PackPaths(mappingsPath, packRootPath, attachablesPath.apply(packRootPath),
-                    geometryPath.apply(packRootPath), animationPath.apply(packRootPath), manifestPath.apply(packRootPath),
+                    geometryPath.apply(packRootPath), animationPath.apply(packRootPath), fontPath.apply(packRootPath),
+                    manifestPath.apply(packRootPath),
                     itemAtlasPath.apply(packRootPath), Optional.ofNullable(packZipFile));
             return new BedrockPack(name, Optional.ofNullable(manifest), paths, packSerializer, assetResolver, Optional.ofNullable(geometryRenderer),
                     reporter.apply(() -> "Bedrock pack " + name + " "), reportSuccesses);

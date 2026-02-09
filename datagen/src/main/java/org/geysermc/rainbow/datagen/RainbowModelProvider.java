@@ -27,7 +27,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.equipment.EquipmentAsset;
 import org.geysermc.rainbow.Rainbow;
 import org.geysermc.rainbow.RainbowIO;
+import org.geysermc.rainbow.CodecUtil;
 import org.geysermc.rainbow.mapping.AssetResolver;
+import org.geysermc.rainbow.mapping.FontDefinition;
 import org.geysermc.rainbow.mapping.PackSerializer;
 import org.geysermc.rainbow.mapping.texture.TextureResource;
 import org.geysermc.rainbow.pack.BedrockPack;
@@ -175,6 +177,15 @@ public abstract class RainbowModelProvider extends FabricModelProvider {
                 this.itemInfos.put(entry.getKey().builtInRegistryHolder().key().identifier(), entry.getValue());
             }
             this.models = models;
+        }
+
+        @Override
+        public Optional<FontDefinition> getFont(Identifier identifier) {
+            return RainbowIO.safeIO(() -> {
+                try (InputStream stream = resourceManager.open(identifier.withPath(path -> "font/" + path + ".json"))) {
+                    return CodecUtil.readJson(FontDefinition.CODEC, stream);
+                }
+            });
         }
 
         @Override

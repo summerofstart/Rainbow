@@ -14,6 +14,8 @@ import java.util.Optional;
 
 public interface AssetResolver {
 
+    Optional<FontDefinition> getFont(Identifier identifier);
+
     Optional<ResolvedModel> getResolvedModel(Identifier identifier);
 
     Optional<ClientItem> getClientItem(Identifier identifier);

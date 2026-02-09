@@ -14,8 +14,10 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.item.equipment.EquipmentAsset;
+import org.geysermc.rainbow.CodecUtil;
 import org.geysermc.rainbow.Rainbow;
 import org.geysermc.rainbow.RainbowIO;
+import org.geysermc.rainbow.mapping.FontDefinition;
 import org.geysermc.rainbow.client.accessor.ResolvedModelAccessor;
 import org.geysermc.rainbow.client.mixin.EntityRenderDispatcherAccessor;
 import org.geysermc.rainbow.mapping.AssetResolver;
@@ -36,6 +38,15 @@ public class MinecraftAssetResolver implements AssetResolver {
         equipmentAssetManager = ((EntityRenderDispatcherAccessor) minecraft.getEntityRenderDispatcher()).getEquipmentAssets();
         resourceManager = minecraft.getResourceManager();
         atlasManager = minecraft.getAtlasManager();
+    }
+
+    @Override
+    public Optional<FontDefinition> getFont(Identifier identifier) {
+        return RainbowIO.safeIO(() -> {
+            try (InputStream stream = resourceManager.open(identifier.withPath(path -> "font/" + path + ".json"))) {
+                return CodecUtil.readJson(FontDefinition.CODEC, stream);
+            }
+        });
     }
 
     @Override

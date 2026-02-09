@@ -6,16 +6,22 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import org.geysermc.rainbow.client.MinecraftAssetResolver;
 import org.geysermc.rainbow.client.PackManager;
+import org.geysermc.rainbow.mapping.FontMapper;
+import org.geysermc.rainbow.pack.BedrockFont;
 import org.geysermc.rainbow.client.mapper.InventoryMapper;
 import org.geysermc.rainbow.client.mapper.PackMapper;
 import org.geysermc.rainbow.pack.BedrockPack;
 
 import java.nio.file.Path;
+import com.mojang.brigadier.context.CommandContext;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
@@ -51,6 +57,21 @@ public class PackGeneratorCommand {
                                 case MAPPED_SUCCESSFULLY -> source.sendFeedback(Component.translatable("commands.rainbow.mapped_held_item"));
                             }
                         }))
+                )
+                .then(ClientCommandManager.literal("mapfont")
+                        .then(ClientCommandManager.argument("id", IdentifierArgument.id())
+                                .executes(context -> {
+                                    Identifier fontId = context.getArgument("id", Identifier.class);
+                                    packManager.runOrElse(pack -> {
+                                        pack.getContext().assetResolver().getFont(fontId).ifPresentOrElse(definition -> {
+                                            BedrockFont bedrockFont = FontMapper.mapFont(definition, pack.getContext().assetResolver());
+                                            pack.mapFont(fontId, bedrockFont);
+                                            context.getSource().sendFeedback(Component.literal("Mapped font " + fontId));
+                                        }, () -> context.getSource().sendError(Component.literal("Could not find font " + fontId)));
+                                    }, () -> context.getSource().sendError(NO_PACK_CREATED));
+                                    return 0;
+                                })
+                        )
                 )
                 .then(ClientCommandManager.literal("mapinventory")
                         .executes(runWithPack(packManager, (source, pack) -> {
