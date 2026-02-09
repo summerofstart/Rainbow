@@ -25,6 +25,8 @@ import net.minecraft.client.renderer.item.properties.select.DisplayContext;
 import net.minecraft.client.renderer.item.properties.select.SelectItemModelProperties;
 import net.minecraft.client.renderer.item.properties.select.TrimMaterialProperty;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.ItemTags;
@@ -40,6 +42,7 @@ import net.minecraft.world.item.equipment.trim.TrimMaterial;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.ArrayUtils;
 import org.geysermc.rainbow.mapping.attachable.AttachableMapper;
+import org.geysermc.rainbow.pack.BedrockFont;
 import org.geysermc.rainbow.mapping.geometry.BedrockGeometryContext;
 import org.geysermc.rainbow.definition.GeyserBaseDefinition;
 import org.geysermc.rainbow.definition.GeyserItemDefinition;
@@ -54,8 +57,10 @@ import org.geysermc.rainbow.mixin.RangeSelectItemModelAccessor;
 import org.geysermc.rainbow.pack.BedrockItem;
 import org.jspecify.annotations.NonNull;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -234,6 +239,28 @@ public class BedrockItemMapper {
         public void create(Identifier bedrockIdentifier, BedrockGeometryContext geometry) {
             List<Identifier> tags = stack.is(ItemTags.TRIMMABLE_ARMOR) ? TRIMMABLE_ARMOR_TAGS : List.of();
 
+            // Map custom fonts from display name and lore
+            Set<Identifier> fonts = new HashSet<>();
+            Component name = stack.get(DataComponents.CUSTOM_NAME);
+            if (name != null) {
+                scanFonts(name, fonts);
+            }
+            net.minecraft.world.item.component.ItemLore lore = stack.get(DataComponents.LORE);
+            if (lore != null) {
+                for (Component line : lore.lines()) {
+                    scanFonts(line, fonts);
+                }
+            }
+
+            for (Identifier fontId : fonts) {
+                if (!fontId.equals(Identifier.withDefaultNamespace("default"))) {
+                    packContext.assetResolver().getFont(fontId).ifPresent(definition -> {
+                        BedrockFont bedrockFont = FontMapper.mapFont(definition, packContext.assetResolver());
+                        packContext.itemConsumer().acceptFont(fontId, bedrockFont);
+                    });
+                }
+            }
+
             GeyserBaseDefinition base = new GeyserBaseDefinition(bedrockIdentifier, Optional.ofNullable(stack.getHoverName().tryCollapseToString()), predicateStack,
                     new GeyserBaseDefinition.BedrockOptions(Optional.empty(), true, geometry.handheld(), calculateProtectionValue(stack), tags),
                     stack.getComponentsPatch());
@@ -250,6 +277,15 @@ public class BedrockItemMapper {
 
         public void report(String problem) {
             reporter.report(() -> problem);
+        }
+
+        private void scanFonts(Component component, Set<Identifier> fonts) {
+            if (component.getStyle().getFont() instanceof FontDescription.Resource resource) {
+                fonts.add(resource.id());
+            }
+            for (Component sibling : component.getSiblings()) {
+                scanFonts(sibling, fonts);
+            }
         }
 
         private static int calculateProtectionValue(ItemStack stack) {
